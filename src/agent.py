@@ -1,4 +1,4 @@
-"""Deep Dive — LangChain-powered research agent with agentic tool use."""
+"""Web Research Agent — LangChain-powered research agent with agentic tool use."""
 
 import json
 import os
@@ -74,7 +74,7 @@ def research(query: str, message_id: str) -> str:
     llm_with_tools = llm.bind_tools(tools)
 
     system = SystemMessage(content=(
-        f"You are Deep Dive, an expert research agent. Today is {today}. "
+        f"You are Web Research Agent, an expert research assistant. Today is {today}. "
         "Your job is to thoroughly research the user's question using web search. "
         "Strategy:\n"
         "1. Break complex questions into sub-queries and search for each\n"
@@ -129,7 +129,7 @@ def research(query: str, message_id: str) -> str:
 
 def main():
     send({"type": "ready"})
-    log("Deep Dive ready")
+    log("Web Research Agent ready")
 
     for line in sys.stdin:
         line = line.strip()

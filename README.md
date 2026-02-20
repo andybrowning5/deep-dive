@@ -1,14 +1,15 @@
-# Deep Dive
+# Web Research Agent
 
 A [Primordial AgentStore](https://github.com/andybrowning5/AgentStore) agent that searches the web for real-time information and synthesizes concise, sourced briefings.
 
 ## What it does
 
-Ask about any topic — news, tech, science, people, companies — and Deep Dive will:
+Ask about any topic — news, tech, science, people, companies — and Web Research Agent will:
 
-1. Search the web via Brave Search API
-2. Synthesize results into a well-structured briefing using Claude
-3. Include inline citations and a sources section
+1. Break your question into targeted search queries
+2. Search the web via Brave Search API (multiple angles)
+3. Synthesize results into a well-structured briefing using Claude
+4. Include inline citations and a sources section
 
 ## Usage
 

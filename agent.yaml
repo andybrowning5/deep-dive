@@ -1,5 +1,5 @@
-name: deep-dive
-display_name: Deep Dive
+name: web-research-agent
+display_name: Web Research Agent
 version: 0.1.0
 description: >
   LangChain-powered research agent that searches the web for real-time information
