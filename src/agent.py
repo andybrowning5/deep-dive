@@ -1,17 +1,17 @@
-"""Deep Dive — research agent that searches the web and synthesizes briefings."""
+"""Deep Dive — LangChain-powered research agent with agentic tool use."""
 
 import json
 import os
 import sys
 from datetime import datetime
 
-import anthropic
 import httpx
+from langchain_anthropic import ChatAnthropic
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.tools import tool
 
 BRAVE_API_KEY = os.environ.get("BRAVE_API_KEY", "")
 BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
-
-client = anthropic.Anthropic()
 
 
 def send(msg: dict) -> None:
@@ -23,12 +23,13 @@ def log(text: str) -> None:
     print(text, file=sys.stderr, flush=True)
 
 
-def brave_search(query: str, count: int = 8) -> list[dict]:
-    """Search the web via Brave Search API."""
+@tool
+def web_search(query: str) -> str:
+    """Search the web for real-time information. Use this to find current facts, news, documentation, or any topic the user asks about. You can call this multiple times with different queries to get broader coverage."""
     try:
         resp = httpx.get(
             BRAVE_SEARCH_URL,
-            params={"q": query, "count": count},
+            params={"q": query, "count": 10},
             headers={
                 "Accept": "application/json",
                 "X-Subscription-Token": BRAVE_API_KEY,
@@ -39,66 +40,82 @@ def brave_search(query: str, count: int = 8) -> list[dict]:
         data = resp.json()
         results = []
         for item in data.get("web", {}).get("results", []):
-            results.append({
-                "title": item.get("title", ""),
-                "url": item.get("url", ""),
-                "description": item.get("description", ""),
-            })
-        return results
+            results.append(
+                f"Title: {item.get('title', '')}\n"
+                f"URL: {item.get('url', '')}\n"
+                f"Description: {item.get('description', '')}"
+            )
+        if not results:
+            return "No results found. Try a different search query."
+        return "\n\n---\n\n".join(results)
     except Exception as e:
-        log(f"Search error: {e}")
-        return []
+        return f"Search error: {e}"
 
 
 def research(query: str, message_id: str) -> str:
-    """Search the web, then synthesize a briefing with Claude."""
-    send({
-        "type": "activity",
-        "tool": "brave_search",
-        "description": f"Searching: {query}",
-        "message_id": message_id,
-    })
-
-    results = brave_search(query)
-
-    if not results:
-        return "I couldn't find any results for that query. Try rephrasing?"
-
-    sources_block = "\n\n".join(
-        f"[{i+1}] {r['title']}\nURL: {r['url']}\n{r['description']}"
-        for i, r in enumerate(results)
-    )
-
+    """Run the LangChain agent to research a topic."""
     send({
         "type": "activity",
         "tool": "thinking",
-        "description": "Synthesizing briefing...",
+        "description": "Thinking about your question...",
         "message_id": message_id,
     })
 
     today = datetime.now().strftime("%B %d, %Y")
 
-    response = client.messages.create(
+    llm = ChatAnthropic(
         model="claude-sonnet-4-5-20250929",
-        max_tokens=2048,
-        system=(
-            f"You are Deep Dive, a research assistant. Today is {today}. "
-            "The user asked a question and you searched the web. "
-            "Synthesize the search results into a clear, well-structured briefing. "
-            "Include inline citations like [1], [2] etc. referencing the sources. "
-            "End with a Sources section listing each numbered source with its URL. "
-            "Be concise but thorough. Use markdown formatting."
-        ),
-        messages=[{
-            "role": "user",
-            "content": (
-                f"Question: {query}\n\n"
-                f"Search results:\n{sources_block}"
-            ),
-        }],
+        max_tokens=4096,
     )
 
-    return response.content[0].text
+    tools = [web_search]
+    llm_with_tools = llm.bind_tools(tools)
+
+    system = SystemMessage(content=(
+        f"You are Deep Dive, an expert research agent. Today is {today}. "
+        "Your job is to thoroughly research the user's question using web search. "
+        "Strategy:\n"
+        "1. Break complex questions into sub-queries and search for each\n"
+        "2. Search multiple times with different angles to get comprehensive coverage\n"
+        "3. For simple greetings or non-research questions, just respond naturally without searching\n"
+        "4. Synthesize all findings into a clear, well-structured briefing with markdown\n"
+        "5. Include inline citations [1], [2] etc. and end with a Sources section\n"
+        "Be thorough but concise. Prioritize accuracy and recency."
+    ))
+
+    messages = [system, HumanMessage(content=query)]
+
+    # Agentic loop — let the model decide when to search and when to stop
+    tool_map = {t.name: t for t in tools}
+    for _ in range(8):  # max iterations
+        response = llm_with_tools.invoke(messages)
+        messages.append(response)
+
+        if not response.tool_calls:
+            break
+
+        for tc in response.tool_calls:
+            send({
+                "type": "activity",
+                "tool": "brave_search",
+                "description": f"Searching: {tc['args'].get('query', '')}",
+                "message_id": message_id,
+            })
+            result = tool_map[tc["name"]].invoke(tc["args"])
+            messages.append({
+                "role": "tool",
+                "content": result,
+                "tool_call_id": tc["id"],
+            })
+
+        send({
+            "type": "activity",
+            "tool": "thinking",
+            "description": "Analyzing results...",
+            "message_id": message_id,
+        })
+
+    return response.content
 
 
 def main():
