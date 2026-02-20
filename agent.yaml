@@ -36,6 +36,9 @@ keys:
   - provider: brave
     env_var: BRAVE_API_KEY
     required: true
+    domain: api.search.brave.com
+    base_url_env: BRAVE_BASE_URL
+    auth_style: x-subscription-token
 
 permissions:
   network:
