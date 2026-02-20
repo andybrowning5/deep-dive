@@ -1,0 +1,49 @@
+name: deep-dive
+display_name: Deep Dive
+version: 0.1.0
+description: >
+  Research agent that searches the web for real-time information and synthesizes
+  concise, sourced briefings. Ask about any topic — news, tech, science, people,
+  companies — and get a well-structured summary with citations.
+
+category: research
+tags:
+  - research
+  - search
+  - web
+  - briefing
+
+author:
+  name: Andy Browning
+  github: andybrowning5
+
+runtime:
+  language: python
+  run_command: python -u src/agent.py
+  setup_command: pip install -r requirements.txt
+  dependencies: requirements.txt
+  default_model:
+    provider: anthropic
+    model: claude-sonnet-4-5-20250929
+  resources:
+    max_memory: 2GB
+    max_cpu: 2
+
+keys:
+  - provider: anthropic
+    env_var: ANTHROPIC_API_KEY
+    required: true
+  - provider: brave
+    env_var: BRAVE_API_KEY
+    required: true
+
+permissions:
+  network:
+    - domain: api.anthropic.com
+      reason: LLM inference for synthesizing research
+    - domain: api.search.brave.com
+      reason: Web search for real-time information
+  filesystem:
+    workspace: readwrite
+  delegation:
+    enabled: false
